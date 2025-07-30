@@ -1,0 +1,93 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String   @unique
+  name      String
+  role      Role     @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relaciones
+  ticketsCreated Ticket[] @relation("TicketCreator")
+  ticketsAssigned Ticket[] @relation("TicketAssignee")
+  conversations Conversation[]
+  
+  @@map("users")
+}
+
+model Equipment {
+  id     String @id @default(cuid())
+  serial String @unique
+  name   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relaciones
+  tickets Ticket[]
+  
+  @@map("equipments")
+}
+
+model Ticket {
+  id           String       @id @default(cuid())
+  subject      String
+  details      String       @db.Text
+  contactPhone String
+  contactEmail String
+  status       TicketStatus @default(OPEN)
+  attachments  Json?        // Array de URLs de archivos
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  
+  // Relaciones
+  createdById    String
+  createdBy      User       @relation("TicketCreator", fields: [createdById], references: [id])
+  
+  assignedToId   String?
+  assignedTo     User?      @relation("TicketAssignee", fields: [assignedToId], references: [id])
+  
+  equipmentId    String
+  equipment      Equipment  @relation(fields: [equipmentId], references: [id])
+  
+  conversations  Conversation[]
+  
+  @@map("tickets")
+}
+
+model Conversation {
+  id        String   @id @default(cuid())
+  message   String   @db.Text
+  isAI      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  
+  // Relaciones
+  ticketId  String
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  
+  @@map("conversations")
+}
+
+enum Role {
+  USER
+  AGENT
+}
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
