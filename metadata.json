@@ -1,0 +1,5 @@
+{
+  "name": "Vichada Support System",
+  "description": "A help desk application for managing support tickets. Users can create tickets for their equipment issues, and support agents can manage, respond to, and resolve them. The app features AI-powered response suggestions for agents to improve efficiency.",
+  "requestFramePermissions": []
+}

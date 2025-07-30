@@ -1,0 +1,41 @@
+// exportacion.js
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const directorioBase = __dirname;
+const archivoSalida = path.join(directorioBase, "exportacion.txt");
+
+function recorrerDirectorios(directorio, salida) {
+  const archivos = fs.readdirSync(directorio);
+
+  for (const archivo of archivos) {
+    if (archivo.startsWith(".")) continue; // Ignorar carpetas o archivos ocultos
+
+    const rutaCompleta = path.join(directorio, archivo);
+    const stat = fs.statSync(rutaCompleta);
+
+    if (stat.isDirectory()) {
+      recorrerDirectorios(rutaCompleta, salida);
+    } else {
+      if (path.resolve(rutaCompleta) === path.resolve(archivoSalida)) continue;
+
+      const rutaRelativa = path.relative(directorioBase, rutaCompleta);
+      const contenido = fs.readFileSync(rutaCompleta, "utf-8");
+
+      salida.write(`\n--- ${rutaRelativa} ---\n`);
+      salida.write(contenido + "\n");
+    }
+  }
+}
+
+const streamSalida = fs.createWriteStream(archivoSalida, { flags: "w" });
+
+recorrerDirectorios(directorioBase, streamSalida);
+
+streamSalida.end(() => {
+  console.log(`Archivo generado: ${archivoSalida}`);
+});
