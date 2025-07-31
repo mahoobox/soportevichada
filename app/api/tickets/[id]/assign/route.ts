@@ -1,69 +1,76 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { currentUser } from '@clerk/nextjs'
-import { prisma } from '@/lib/prisma'
-import { syncUser } from '@/lib/sync-user'
-import { sendEmail, generateTicketEmailTemplate } from '@/lib/email'
+// app/api/tickets/[id]/assign/route.ts
+import { NextRequest, NextResponse } from "next/server";
+import { currentUser } from "@clerk/nextjs";
+import { prisma } from "@/lib/prisma";
+import { syncUser } from "@/lib/sync-user";
+import { sendEmail, generateTicketEmailTemplate } from "@/lib/email";
 
 interface Params {
   params: {
-    id: string
-  }
+    id: string;
+  };
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
   try {
-    const clerkUser = await currentUser()
+    const clerkUser = await currentUser();
     if (!clerkUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await syncUser(clerkUser)
-    
-    if (user.role !== 'AGENT') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    const user = await syncUser(clerkUser);
+
+    if (user.role !== "AGENT") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const ticket = await prisma.ticket.findUnique({
       where: { id: params.id },
       include: {
         createdBy: true,
-        equipment: true
-      }
-    })
+        equipment: true,
+      },
+    });
 
     if (!ticket) {
-      return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
+      return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
     }
 
     await prisma.ticket.update({
       where: { id: ticket.id },
       data: {
         assignedToId: user.id,
-        status: 'IN_PROGRESS',
-        updatedAt: new Date()
-      }
-    })
+        status: "IN_PROGRESS",
+        updatedAt: new Date(),
+      },
+    });
 
     // Enviar emails SOLO si la variable base URL está configurada
     if (process.env.NEXT_PUBLIC_BASE_URL) {
-      const ticketUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/tickets/${ticket.id}`
-      
-      const userEmails = [ticket.contactEmail]
+      const ticketUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/tickets/${ticket.id}`;
+
+      // 1. SIEMPRE incluir emails de usuarios
+      const userEmails = [ticket.contactEmail];
       if (ticket.createdBy.email !== ticket.contactEmail) {
-        userEmails.push(ticket.createdBy.email)
+        userEmails.push(ticket.createdBy.email);
       }
 
+      // 2. SIEMPRE incluir TODOS los agentes (incluyendo el que asigna el ticket)
       const agents = await prisma.agent.findMany({
-        where: {
-          email: {
-            not: user.email
-          }
-        },
-        select: { email: true }
-      })
-      const otherAgentEmails = agents.map(agent => agent.email)
+        select: { email: true },
+      });
+      const agentEmails = agents.map((agent) => agent.email);
 
-      const allEmails = [...userEmails, ...otherAgentEmails]
+      // 3. Combinar todos los emails SIN filtrar
+      const allEmails = [...new Set([...userEmails, ...agentEmails])];
+
+      console.log(
+        `📧 Sending assignment notification for ticket ${ticket.id}:`
+      );
+      console.log(`   - User emails: ${userEmails.join(", ")}`);
+      console.log(`   - Agent emails: ${agentEmails.join(", ")}`);
+      console.log(`   - All recipients: ${allEmails.join(", ")}`);
+      console.log(`   - Assigned to: ${user.name} (${user.email})`);
 
       try {
         if (allEmails.length > 0) {
@@ -74,23 +81,30 @@ export async function POST(request: NextRequest, { params }: Params) {
               ticket.id,
               ticket.subject,
               `Su ticket ha sido asignado al agente ${user.name} y está siendo revisado. El agente se pondrá en contacto con usted pronto.`,
-              'Sistema',
+              "Sistema",
               ticketUrl,
-              'assigned'
-            )
-          })
-          console.log('✅ Assignment notification email sent for ticket:', ticket.id)
+              "assigned"
+            ),
+          });
+          console.log(
+            `✅ Assignment notification email sent to ${allEmails.length} recipients`
+          );
         }
       } catch (emailError) {
-        console.error('❌ Error sending assignment notification:', emailError)
+        console.error("❌ Error sending assignment notification:", emailError);
       }
     } else {
-      console.warn('NEXT_PUBLIC_BASE_URL not configured - skipping email notification')
+      console.warn(
+        "NEXT_PUBLIC_BASE_URL not configured - skipping email notification"
+      );
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error assigning ticket:', error)
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+    console.error("Error assigning ticket:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }

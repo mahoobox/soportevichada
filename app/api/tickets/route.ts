@@ -56,7 +56,6 @@ export async function POST(request: NextRequest) {
       where: {
         serial: {
           equals: equipmentSerial,
-          //mode: "insensitive",
         },
       },
     });
@@ -85,27 +84,62 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Enviar email de notificación
+    // Enviar emails de notificación
     const ticketUrl = `${
       process.env.NEXT_PUBLIC_BASE_URL || "https://soporteequiposv.vercel.app"
     }/tickets/${ticket.id}`;
 
-    const emailRecipients = [contactEmail];
+    // 1. SIEMPRE incluir emails de usuarios
+    const userEmails = [contactEmail];
     if (contactEmail !== user.email) {
-      emailRecipients.push(user.email);
+      userEmails.push(user.email);
     }
 
-    await sendEmail({
-      to: emailRecipients,
-      subject: `Nuevo Ticket Creado - ${ticket.id}`,
-      htmlContent: generateTicketEmailTemplate(
-        ticket.id,
-        ticket.subject,
-        ticket.details,
-        user.name,
-        ticketUrl
-      ),
+    // 2. SIEMPRE incluir TODOS los agentes
+    const agents = await prisma.agent.findMany({
+      select: { email: true },
     });
+    const agentEmails = agents.map((agent) => agent.email);
+
+    // 3. Combinar todos los emails SIN filtrar
+    const allEmails = [...new Set([...userEmails, ...agentEmails])];
+
+    console.log(`📧 Sending new ticket notification for ticket ${ticket.id}:`);
+    console.log(`   - User emails: ${userEmails.join(", ")}`);
+    console.log(`   - Agent emails: ${agentEmails.join(", ")}`);
+    console.log(`   - All recipients: ${allEmails.join(", ")}`);
+    console.log(`   - Created by: ${user.name} (${user.email})`);
+
+    try {
+      if (allEmails.length > 0) {
+        let emailMessage = ticket.details;
+
+        // Si hay archivos adjuntos, agregar información al mensaje
+        if (attachments && attachments.length > 0) {
+          emailMessage += `\n\n[Se han adjuntado ${attachments.length} archivo(s) a este ticket]`;
+        }
+
+        await sendEmail({
+          to: allEmails,
+          subject: `Nuevo Ticket Creado - ${ticket.id}: ${ticket.subject}`,
+          htmlContent: generateTicketEmailTemplate(
+            ticket.id,
+            ticket.subject,
+            emailMessage,
+            user.name,
+            ticketUrl,
+            "created"
+          ),
+        });
+
+        console.log(
+          `✅ New ticket notification email sent to ${allEmails.length} recipients`
+        );
+      }
+    } catch (emailError) {
+      console.error("❌ Error sending new ticket notification:", emailError);
+      // No fallar la creación del ticket por un error de email
+    }
 
     return NextResponse.json({ ticketId: ticket.id });
   } catch (error) {

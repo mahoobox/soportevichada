@@ -69,21 +69,29 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (process.env.NEXT_PUBLIC_BASE_URL) {
       const ticketUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/tickets/${ticket.id}`;
 
+      // 1. SIEMPRE incluir emails de usuarios (creador del ticket y contacto)
       const userEmails = [ticket.contactEmail];
       if (ticket.createdBy.email !== ticket.contactEmail) {
         userEmails.push(ticket.createdBy.email);
       }
 
+      // 2. SIEMPRE incluir TODOS los agentes (sin excluir a nadie)
       const agents = await prisma.agent.findMany({
         select: { email: true },
       });
       const agentEmails = agents.map((agent) => agent.email);
 
+      // 3. Combinar todos los emails SIN filtrar por el usuario actual
       const allEmails = [...new Set([...userEmails, ...agentEmails])];
-      const recipientEmails = allEmails.filter((email) => email !== user.email);
+
+      console.log(`📧 Sending notification for ticket ${ticket.id}:`);
+      console.log(`   - User emails: ${userEmails.join(", ")}`);
+      console.log(`   - Agent emails: ${agentEmails.join(", ")}`);
+      console.log(`   - All recipients: ${allEmails.join(", ")}`);
+      console.log(`   - Current user: ${user.email} (${user.role})`);
 
       try {
-        if (recipientEmails.length > 0) {
+        if (allEmails.length > 0) {
           let emailMessage = message || "";
 
           // Si hay archivos adjuntos, agregar información al mensaje
@@ -91,25 +99,39 @@ export async function POST(request: NextRequest, { params }: Params) {
             emailMessage += `\n\n[Se han adjuntado ${attachments.length} archivo(s) a esta respuesta]`;
           }
 
+          // Determinar el tipo de acción para el template
+          const actionType = user.role === "AGENT" ? "updated" : "updated";
+          const emailSubject =
+            user.role === "AGENT"
+              ? `Respuesta de Agente en Ticket ${ticket.id}: ${ticket.subject}`
+              : `Nueva respuesta de Usuario en Ticket ${ticket.id}: ${ticket.subject}`;
+
           await sendEmail({
-            to: recipientEmails,
-            subject: `Respuesta en Ticket ${ticket.id}: ${ticket.subject}`,
+            to: allEmails,
+            subject: emailSubject,
             htmlContent: generateTicketEmailTemplate(
               ticket.id,
               ticket.subject,
               emailMessage,
               user.name,
               ticketUrl,
-              "updated"
+              actionType
             ),
           });
+
           console.log(
-            "✅ Notification email sent for ticket response:",
-            ticket.id
+            `✅ Notification email sent successfully to ${allEmails.length} recipients`
           );
+          console.log(`   Recipients: ${allEmails.join(", ")}`);
         }
       } catch (emailError) {
         console.error("❌ Error sending notification email:", emailError);
+        console.error("   Email details:", {
+          recipients: allEmails,
+          ticketId: ticket.id,
+          userRole: user.role,
+          userEmail: user.email,
+        });
       }
     } else {
       console.warn(
