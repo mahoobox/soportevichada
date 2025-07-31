@@ -69,29 +69,25 @@ export async function POST(request: NextRequest, { params }: Params) {
     if (process.env.NEXT_PUBLIC_BASE_URL) {
       const ticketUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/tickets/${ticket.id}`;
 
-      // 1. SIEMPRE incluir emails de usuarios (creador del ticket y contacto)
+      // 1. Emails de usuarios (TO - destinatarios visibles)
       const userEmails = [ticket.contactEmail];
       if (ticket.createdBy.email !== ticket.contactEmail) {
         userEmails.push(ticket.createdBy.email);
       }
 
-      // 2. SIEMPRE incluir TODOS los agentes (sin excluir a nadie)
+      // 2. Emails de agentes
       const agents = await prisma.agent.findMany({
         select: { email: true },
       });
       const agentEmails = agents.map((agent) => agent.email);
 
-      // 3. Combinar todos los emails SIN filtrar por el usuario actual
-      const allEmails = [...new Set([...userEmails, ...agentEmails])];
-
       console.log(`📧 Sending notification for ticket ${ticket.id}:`);
-      console.log(`   - User emails: ${userEmails.join(", ")}`);
-      console.log(`   - Agent emails: ${agentEmails.join(", ")}`);
-      console.log(`   - All recipients: ${allEmails.join(", ")}`);
+      console.log(`   - User emails (TO): ${userEmails.join(", ")}`);
+      console.log(`   - Agent emails (BCC): ${agentEmails.join(", ")}`);
       console.log(`   - Current user: ${user.email} (${user.role})`);
 
       try {
-        if (allEmails.length > 0) {
+        if (userEmails.length > 0 || agentEmails.length > 0) {
           let emailMessage = message || "";
 
           // Si hay archivos adjuntos, agregar información al mensaje
@@ -107,7 +103,8 @@ export async function POST(request: NextRequest, { params }: Params) {
               : `Nueva respuesta de Usuario en Ticket ${ticket.id}: ${ticket.subject}`;
 
           await sendEmail({
-            to: allEmails,
+            to: userEmails,
+            bcc: agentEmails,
             subject: emailSubject,
             htmlContent: generateTicketEmailTemplate(
               ticket.id,
@@ -119,15 +116,15 @@ export async function POST(request: NextRequest, { params }: Params) {
             ),
           });
 
-          console.log(
-            `✅ Notification email sent successfully to ${allEmails.length} recipients`
-          );
-          console.log(`   Recipients: ${allEmails.join(", ")}`);
+          console.log(`✅ Notification email sent successfully`);
+          console.log(`   TO recipients: ${userEmails.length}`);
+          console.log(`   BCC recipients: ${agentEmails.length}`);
         }
       } catch (emailError) {
         console.error("❌ Error sending notification email:", emailError);
         console.error("   Email details:", {
-          recipients: allEmails,
+          toRecipients: userEmails,
+          bccRecipients: agentEmails,
           ticketId: ticket.id,
           userRole: user.role,
           userEmail: user.email,

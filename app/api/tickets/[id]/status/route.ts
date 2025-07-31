@@ -71,20 +71,17 @@ export async function PUT(request: NextRequest, { params }: Params) {
     if (process.env.NEXT_PUBLIC_BASE_URL) {
       const ticketUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/tickets/${ticket.id}`;
 
-      // 1. SIEMPRE incluir emails de usuarios
+      // 1. Emails de usuarios (TO - destinatarios visibles)
       const userEmails = [ticket.contactEmail];
       if (ticket.createdBy.email !== ticket.contactEmail) {
         userEmails.push(ticket.createdBy.email);
       }
 
-      // 2. SIEMPRE incluir TODOS los agentes (incluyendo el que cambia el estado)
+      // 2. Emails de agentes
       const agents = await prisma.agent.findMany({
         select: { email: true },
       });
       const agentEmails = agents.map((agent) => agent.email);
-
-      // 3. Combinar todos los emails SIN filtrar
-      const allEmails = [...new Set([...userEmails, ...agentEmails])];
 
       const statusText =
         status === "OPEN"
@@ -97,15 +94,15 @@ export async function PUT(request: NextRequest, { params }: Params) {
         `📧 Sending status change notification for ticket ${ticket.id}:`
       );
       console.log(`   - New status: ${statusText}`);
-      console.log(`   - User emails: ${userEmails.join(", ")}`);
-      console.log(`   - Agent emails: ${agentEmails.join(", ")}`);
-      console.log(`   - All recipients: ${allEmails.join(", ")}`);
+      console.log(`   - User emails (TO): ${userEmails.join(", ")}`);
+      console.log(`   - Agent emails (BCC): ${agentEmails.join(", ")}`);
       console.log(`   - Changed by: ${user.name} (${user.email})`);
 
       try {
-        if (allEmails.length > 0) {
+        if (userEmails.length > 0 || agentEmails.length > 0) {
           await sendEmail({
-            to: allEmails,
+            to: userEmails,
+            bcc: agentEmails,
             subject: `Ticket ${ticket.id} - Estado cambiado a ${statusText}`,
             htmlContent: generateTicketEmailTemplate(
               ticket.id,
@@ -116,9 +113,9 @@ export async function PUT(request: NextRequest, { params }: Params) {
               actionType
             ),
           });
-          console.log(
-            `✅ Status change notification email sent to ${allEmails.length} recipients`
-          );
+          console.log(`✅ Status change notification email sent`);
+          console.log(`   TO recipients: ${userEmails.length}`);
+          console.log(`   BCC recipients: ${agentEmails.length}`);
         }
       } catch (emailError) {
         console.error(

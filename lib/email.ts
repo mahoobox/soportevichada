@@ -3,13 +3,16 @@ import nodemailer from "nodemailer";
 
 interface EmailData {
   to: string[];
+  bcc?: string[]; // Nuevo campo para copia oculta
   subject: string;
   htmlContent: string;
 }
 
-export async function sendEmail({ to, subject, htmlContent }: EmailData) {
-  console.log("Attempting to send email via SMTP to:", to);
-  console.log("Subject:", subject);
+export async function sendEmail({ to, bcc, subject, htmlContent }: EmailData) {
+  console.log("Attempting to send email via SMTP:");
+  console.log("  TO (visible):", to.join(", "));
+  console.log("  BCC (hidden):", bcc?.join(", ") || "none");
+  console.log("  Subject:", subject);
 
   try {
     // Crear transporter con variables de entorno
@@ -23,17 +26,21 @@ export async function sendEmail({ to, subject, htmlContent }: EmailData) {
       },
     });
 
-    const result = await transporter.sendMail({
+    const mailOptions = {
       from: {
         name: process.env.SENDER_NAME,
         address: process.env.SENDER_EMAIL,
       },
       to: to.join(", "),
+      bcc: bcc && bcc.length > 0 ? bcc.join(", ") : undefined,
       subject,
       html: htmlContent,
-    });
+    };
+
+    const result = await transporter.sendMail(mailOptions);
 
     console.log("✅ Email sent successfully via SMTP:", result.messageId);
+    console.log(`   Total recipients: ${to.length + (bcc?.length || 0)}`);
     return result;
   } catch (error) {
     console.error("❌ Error sending email via SMTP:", error);
@@ -124,6 +131,9 @@ export function generateTicketEmailTemplate(
                     <p style="margin: 0; font-size: 14px; color: #6b7280;">
                         <strong>¿Necesitas ayuda?</strong><br>
                         Responde directamente a este email o accede al sistema usando el enlace de arriba.
+                    </p>
+                    <p style="margin: 10px 0 0 0; font-size: 12px; color: #9ca3af;">
+                        <em>Este mensaje ha sido enviado a los usuarios involucrados y agentes del sistema.</em>
                     </p>
                 </div>
             </div>
