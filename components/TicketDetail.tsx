@@ -16,8 +16,8 @@ interface User {
 interface Conversation {
   id: string;
   message: string;
+  attachments: string[] | null;
   isAI: boolean;
-  attachments?: string[] | null;
   createdAt: Date;
   author: {
     name: string;
@@ -172,9 +172,7 @@ export default function TicketDetail({ ticket, currentUser }: Props) {
     }
   };
 
-  const attachments = Array.isArray(ticket.attachments)
-    ? ticket.attachments
-    : [];
+  const attachments = ticket.attachments || [];
 
   const renderAttachments = (urls: string[] | null) => {
     if (!urls || urls.length === 0) return null;

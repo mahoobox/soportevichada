@@ -1,4 +1,4 @@
-// types/index.ts (ACTUALIZADO)
+// types/index.ts
 export interface User {
   id: string;
   clerkId: string;
@@ -41,7 +41,7 @@ export interface Ticket {
 export interface Conversation {
   id: string;
   message: string;
-  attachments?: string[] | null;
+  attachments?: any; // JsonValue from Prisma
   isAI: boolean;
   createdAt: Date;
   ticketId: string;
