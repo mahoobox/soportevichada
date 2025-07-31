@@ -139,28 +139,28 @@ SHADOW_DATABASE_URL="mysql://usuario:password@host:3306/nombre_base_datos_shadow
 # ===========================================
 # AUTENTICACIÓN CLERK
 # ===========================================
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="pk_test_XXXXXXXXXXXXXXXXXXXXXXXX"
-CLERK_SECRET_KEY="sk_test_XXXXXXXXXXXXXXXXXXXXXXXX"
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY="CLERK_PUBLISHABLE_KEY_EJEMPLO"
+CLERK_SECRET_KEY="CLERK_SECRET_KEY_EJEMPLO"
 
 # ===========================================
 # RECAPTCHA (Google)
 # ===========================================
-NEXT_PUBLIC_RECAPTCHA_SITE_KEY="6Le-XXXXXXXXXXXXXXXX"
-RECAPTCHA_SECRET_KEY="6Le-XXXXXXXXXXXXXXXXXXXXXXXX"
+NEXT_PUBLIC_RECAPTCHA_SITE_KEY="RECAPTCHA_SITE_KEY_EJEMPLO"
+RECAPTCHA_SECRET_KEY="RECAPTCHA_SECRET_KEY_EJEMPLO"
 
 # ===========================================
 # VERCEL BLOB STORAGE
 # ===========================================
-BLOB_READ_WRITE_TOKEN="vercel_blob_rw_XXXXXXXXXXXXXXXXXXXXXXXX"
+BLOB_READ_WRITE_TOKEN="VERCEL_BLOB_TOKEN_EJEMPLO"
 
 # ===========================================
 # EMAIL SMTP (Brevo)
 # ===========================================
-BREVO_API_KEY="xsmtpsib-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+BREVO_API_KEY="BREVO_API_KEY_EJEMPLO"
 BREVO_SMTP_SERVER="smtp-relay.brevo.com"
 BREVO_SMTP_PORT="587"
 BREVO_SMTP_USER="usuario@smtp-brevo.com"
-BREVO_SMTP_PASS="clave-api-smtp-brevo"
+BREVO_SMTP_PASS="CLAVE_SMTP_EJEMPLO"
 
 # Configuración del remitente
 SENDER_NAME="Nombre del Remitente"
@@ -170,7 +170,6 @@ SENDER_EMAIL="correo@miorganizacion.com"
 # URL BASE (para links en emails)
 # ===========================================
 NEXT_PUBLIC_BASE_URL="https://mi-app.vercel.app"
-
 ```
 
 ### **Obtener las Claves Necesarias**
