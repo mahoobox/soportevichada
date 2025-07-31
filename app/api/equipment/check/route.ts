@@ -14,11 +14,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // MySQL: Usar LOWER() para búsqueda case-insensitive
     const equipment = await prisma.equipment.findFirst({
       where: {
         serial: {
           equals: serial,
-          mode: "insensitive",
+          // Remover mode: "insensitive" para MySQL
         },
       },
     });

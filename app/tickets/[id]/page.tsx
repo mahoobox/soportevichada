@@ -1,29 +1,29 @@
-// app/tickets/[id]/page.tsx
-import { currentUser } from "@clerk/nextjs";
-import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { syncUser } from "@/lib/sync-user";
-import Header from "@/components/Header";
-import TicketDetail from "@/components/TicketDetail";
+import { currentUser } from '@clerk/nextjs'
+import { redirect } from 'next/navigation'
+import { prisma } from '@/lib/prisma'
+import { syncUser } from '@/lib/sync-user'
+import Header from '@/components/Header'
+import TicketDetail from '@/components/TicketDetail'
+import { TicketWithRelations } from '@/types'
 
 interface Props {
   params: {
-    id: string;
-  };
+    id: string
+  }
 }
 
 export default async function TicketDetailPage({ params }: Props) {
-  const clerkUser = await currentUser();
-
+  const clerkUser = await currentUser()
+  
   if (!clerkUser) {
-    redirect("/sign-in");
+    redirect('/sign-in')
   }
 
-  const user = await syncUser(clerkUser);
+  const user = await syncUser(clerkUser)
 
-  const ticket = await prisma.ticket.findUnique({
+  const ticketRaw = await prisma.ticket.findUnique({
     where: {
-      id: params.id,
+      id: params.id
     },
     include: {
       createdBy: true,
@@ -31,31 +31,39 @@ export default async function TicketDetailPage({ params }: Props) {
       equipment: true,
       conversations: {
         include: {
-          author: true,
+          author: true
         },
         orderBy: {
-          createdAt: "asc",
-        },
-      },
-    },
-  });
+          createdAt: 'asc'
+        }
+      }
+    }
+  })
 
-  if (!ticket) {
-    redirect("/dashboard");
+  if (!ticketRaw) {
+    redirect('/dashboard')
   }
 
-  // Verificar que el usuario tenga acceso al ticket
-  if (user.role === "USER" && ticket.createdById !== user.id) {
-    redirect("/dashboard");
+  if (user.role === 'USER' && ticketRaw.createdById !== user.id) {
+    redirect('/dashboard')
+  }
+
+  const ticket: TicketWithRelations = {
+    ...ticketRaw,
+    attachments: Array.isArray(ticketRaw.attachments) 
+      ? ticketRaw.attachments as string[]
+      : ticketRaw.attachments 
+        ? [ticketRaw.attachments as string]
+        : null
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header user={user} />
-
+      
       <main className="container mx-auto p-6">
         <TicketDetail ticket={ticket} currentUser={user} />
       </main>
     </div>
-  );
+  )
 }

@@ -51,12 +51,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Buscar equipo por serial
+    // Buscar equipo por serial (sin mode insensitive para MySQL)
     const equipment = await prisma.equipment.findFirst({
       where: {
         serial: {
           equals: equipmentSerial,
-          mode: "insensitive",
+          // Remover mode: "insensitive" para MySQL
         },
       },
     });
@@ -95,17 +95,22 @@ export async function POST(request: NextRequest) {
       emailRecipients.push(user.email);
     }
 
-    await sendEmail({
-      to: emailRecipients,
-      subject: `Nuevo Ticket Creado - ${ticket.id}`,
-      htmlContent: generateTicketEmailTemplate(
-        ticket.id,
-        ticket.subject,
-        ticket.details,
-        user.name,
-        ticketUrl
-      ),
-    });
+    try {
+      await sendEmail({
+        to: emailRecipients,
+        subject: `Nuevo Ticket Creado - ${ticket.id}`,
+        htmlContent: generateTicketEmailTemplate(
+          ticket.id,
+          ticket.subject,
+          ticket.details,
+          user.name,
+          ticketUrl
+        ),
+      });
+    } catch (emailError) {
+      console.error("Error sending email:", emailError);
+      // No fallar si el email no se puede enviar
+    }
 
     return NextResponse.json({ ticketId: ticket.id });
   } catch (error) {
