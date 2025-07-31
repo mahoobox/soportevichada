@@ -1,112 +1,105 @@
-// app/api/tickets/[id]/conversations/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { currentUser } from "@clerk/nextjs";
-import { prisma } from "@/lib/prisma";
-import { syncUser } from "@/lib/sync-user";
-import { sendEmail, generateTicketEmailTemplate } from "@/lib/email";
+import { NextRequest, NextResponse } from 'next/server'
+import { currentUser } from '@clerk/nextjs'
+import { prisma } from '@/lib/prisma'
+import { syncUser } from '@/lib/sync-user'
+import { sendEmail, generateTicketEmailTemplate } from '@/lib/email'
 
 interface Params {
   params: {
-    id: string;
-  };
+    id: string
+  }
 }
 
 export async function POST(request: NextRequest, { params }: Params) {
   try {
-    const clerkUser = await currentUser();
+    const clerkUser = await currentUser()
     if (!clerkUser) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const user = await syncUser(clerkUser);
-    const body = await request.json();
-    const { message } = body;
+    const user = await syncUser(clerkUser)
+    const body = await request.json()
+    const { message } = body
 
-    // Verificar que el ticket existe y el usuario tiene acceso
     const ticket = await prisma.ticket.findUnique({
       where: { id: params.id },
       include: {
         createdBy: true,
         assignedTo: true,
-      },
-    });
+        equipment: true
+      }
+    })
 
     if (!ticket) {
-      return NextResponse.json({ error: "Ticket not found" }, { status: 404 });
+      return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
     }
 
-    // Verificar permisos
-    const hasAccess = user.role === "AGENT" || ticket.createdById === user.id;
+    const hasAccess = user.role === 'AGENT' || ticket.createdById === user.id
     if (!hasAccess) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     }
 
-    // Crear conversación
     const conversation = await prisma.conversation.create({
       data: {
         message,
         isAI: false,
         ticketId: ticket.id,
-        authorId: user.id,
-      },
-    });
+        authorId: user.id
+      }
+    })
 
-    // Actualizar ticket
     const updatedTicket = await prisma.ticket.update({
       where: { id: ticket.id },
       data: {
         updatedAt: new Date(),
-        // Si es un agente respondiendo y el ticket está abierto, cambiar a en progreso
-        status:
-          user.role === "AGENT" && ticket.status === "OPEN"
-            ? "IN_PROGRESS"
-            : ticket.status,
-        // Si es un agente y el ticket no tiene asignado, asignarlo automáticamente
-        assignedToId:
-          user.role === "AGENT" && !ticket.assignedToId
-            ? user.id
-            : ticket.assignedToId,
-      },
-    });
+        status: user.role === 'AGENT' && ticket.status === 'OPEN' ? 'IN_PROGRESS' : ticket.status,
+        assignedToId: user.role === 'AGENT' && !ticket.assignedToId ? user.id : ticket.assignedToId
+      }
+    })
 
-    // Preparar emails
-    const ticketUrl = `${
-      process.env.NEXT_PUBLIC_BASE_URL || "https://soporteequiposv.vercel.app"
-    }/tickets/${ticket.id}`;
-    const emailRecipients = [ticket.contactEmail];
+    // Enviar emails SOLO si la variable base URL está configurada
+    if (process.env.NEXT_PUBLIC_BASE_URL) {
+      const ticketUrl = `${process.env.NEXT_PUBLIC_BASE_URL}/tickets/${ticket.id}`
+      
+      const userEmails = [ticket.contactEmail]
+      if (ticket.createdBy.email !== ticket.contactEmail) {
+        userEmails.push(ticket.createdBy.email)
+      }
+      
+      const agents = await prisma.agent.findMany({
+        select: { email: true }
+      })
+      const agentEmails = agents.map(agent => agent.email)
 
-    // Añadir email del creador si es diferente al contactEmail
-    if (ticket.createdBy.email !== ticket.contactEmail) {
-      emailRecipients.push(ticket.createdBy.email);
+      const allEmails = [...new Set([...userEmails, ...agentEmails])]
+      const recipientEmails = allEmails.filter(email => email !== user.email)
+
+      try {
+        if (recipientEmails.length > 0) {
+          await sendEmail({
+            to: recipientEmails,
+            subject: `Respuesta en Ticket ${ticket.id}: ${ticket.subject}`,
+            htmlContent: generateTicketEmailTemplate(
+              ticket.id,
+              ticket.subject,
+              message,
+              user.name,
+              ticketUrl,
+              'updated'
+            )
+          })
+          console.log('✅ Notification email sent for ticket response:', ticket.id)
+        }
+      } catch (emailError) {
+        console.error('❌ Error sending notification email:', emailError)
+      }
+    } else {
+      console.warn('NEXT_PUBLIC_BASE_URL not configured - skipping email notification')
     }
 
-    // Si el que responde no es el creador, añadir su email también
-    if (
-      user.id !== ticket.createdById &&
-      !emailRecipients.includes(user.email)
-    ) {
-      emailRecipients.push(user.email);
-    }
-
-    // Enviar notificación por email
-    await sendEmail({
-      to: emailRecipients,
-      subject: `Respuesta en Ticket ${ticket.id} - ${ticket.subject}`,
-      htmlContent: generateTicketEmailTemplate(
-        ticket.id,
-        ticket.subject,
-        message,
-        user.name,
-        ticketUrl
-      ),
-    });
-
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Error adding conversation:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    console.error('Error adding conversation:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
