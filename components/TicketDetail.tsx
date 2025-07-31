@@ -3,6 +3,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import FileUpload from "./FileUpload";
+import { PaperClipIcon } from "./Icons";
 
 interface User {
   id: string;
@@ -15,6 +17,7 @@ interface Conversation {
   id: string;
   message: string;
   isAI: boolean;
+  attachments?: string[] | null;
   createdAt: Date;
   author: {
     name: string;
@@ -54,6 +57,7 @@ interface Props {
 export default function TicketDetail({ ticket, currentUser }: Props) {
   const router = useRouter();
   const [newMessage, setNewMessage] = useState("");
+  const [messageAttachments, setMessageAttachments] = useState<File[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isAgent = currentUser.role === "AGENT";
@@ -117,11 +121,32 @@ export default function TicketDetail({ ticket, currentUser }: Props) {
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim()) return;
+    if (!newMessage.trim() && messageAttachments.length === 0) return;
 
     setIsSubmitting(true);
 
     try {
+      // Subir archivos si existen
+      let attachmentUrls: string[] = [];
+      if (messageAttachments.length > 0) {
+        const uploadPromises = messageAttachments.map(async (file) => {
+          const formData = new FormData();
+          formData.append("file", file);
+
+          const response = await fetch("/api/upload", {
+            method: "POST",
+            body: formData,
+          });
+
+          if (!response.ok) throw new Error("Error uploading file");
+
+          const { url } = await response.json();
+          return url;
+        });
+
+        attachmentUrls = await Promise.all(uploadPromises);
+      }
+
       const response = await fetch(`/api/tickets/${ticket.id}/conversations`, {
         method: "POST",
         headers: {
@@ -129,16 +154,19 @@ export default function TicketDetail({ ticket, currentUser }: Props) {
         },
         body: JSON.stringify({
           message: newMessage,
+          attachments: attachmentUrls.length > 0 ? attachmentUrls : null,
           isAI: false,
         }),
       });
 
       if (response.ok) {
         setNewMessage("");
+        setMessageAttachments([]);
         router.refresh();
       }
     } catch (error) {
       console.error("Error sending message:", error);
+      alert("Error al enviar el mensaje");
     } finally {
       setIsSubmitting(false);
     }
@@ -147,6 +175,27 @@ export default function TicketDetail({ ticket, currentUser }: Props) {
   const attachments = Array.isArray(ticket.attachments)
     ? ticket.attachments
     : [];
+
+  const renderAttachments = (urls: string[] | null) => {
+    if (!urls || urls.length === 0) return null;
+
+    return (
+      <div className="mt-2 flex flex-wrap gap-2">
+        {urls.map((url, index) => (
+          <a
+            key={index}
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center px-2 py-1 bg-blue-50 text-blue-700 text-xs rounded-md hover:bg-blue-100 transition"
+          >
+            <PaperClipIcon className="w-3 h-3 mr-1" />
+            Archivo {index + 1}
+          </a>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="bg-white shadow-lg rounded-lg overflow-hidden">
@@ -197,21 +246,9 @@ export default function TicketDetail({ ticket, currentUser }: Props) {
         {attachments.length > 0 && (
           <div className="mt-4">
             <strong className="text-sm text-gray-600">
-              Archivos adjuntos:
+              Archivos adjuntos del ticket:
             </strong>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {attachments.map((url, index) => (
-                <a
-                  key={index}
-                  href={url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 hover:text-blue-800 text-sm underline"
-                >
-                  Archivo {index + 1}
-                </a>
-              ))}
-            </div>
+            {renderAttachments(attachments)}
           </div>
         )}
       </header>
@@ -230,6 +267,7 @@ export default function TicketDetail({ ticket, currentUser }: Props) {
             <div className="max-w-xl p-4 rounded-lg bg-gray-100 text-gray-800">
               <p className="font-bold">{ticket.createdBy.name}</p>
               <p className="whitespace-pre-wrap">{ticket.details}</p>
+              {renderAttachments(attachments)}
               <p className="text-xs text-gray-500 mt-2 text-right">
                 {new Date(ticket.createdAt).toLocaleString("es-ES")}
               </p>
@@ -260,6 +298,7 @@ export default function TicketDetail({ ticket, currentUser }: Props) {
                 >
                   <p className="font-bold">{conversation.author.name}</p>
                   <p className="whitespace-pre-wrap">{conversation.message}</p>
+                  {renderAttachments(conversation.attachments)}
                   <p className="text-xs text-gray-500 mt-2 text-right">
                     {new Date(conversation.createdAt).toLocaleString("es-ES")}
                   </p>
@@ -282,19 +321,31 @@ export default function TicketDetail({ ticket, currentUser }: Props) {
             Responder
           </h2>
 
-          <textarea
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            rows={5}
-            className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-            placeholder="Escribe tu respuesta aquí..."
-          />
+          <div className="space-y-4">
+            <textarea
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              rows={5}
+              className="w-full p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Escribe tu respuesta aquí..."
+            />
+
+            <FileUpload
+              files={messageAttachments}
+              onFilesChange={setMessageAttachments}
+              maxFiles={3}
+              disabled={isSubmitting}
+            />
+          </div>
 
           <div className="mt-4 flex flex-wrap justify-between items-center gap-4">
             <div className="flex gap-2">
               <button
                 onClick={handleSendMessage}
-                disabled={isSubmitting || !newMessage.trim()}
+                disabled={
+                  isSubmitting ||
+                  (!newMessage.trim() && messageAttachments.length === 0)
+                }
                 className="px-6 py-2 bg-blue-600 text-white font-semibold rounded-md hover:bg-blue-700 disabled:bg-blue-300 disabled:cursor-not-allowed"
               >
                 {isSubmitting ? "Enviando..." : "Enviar Mensaje"}

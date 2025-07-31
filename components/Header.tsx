@@ -23,12 +23,20 @@ export default function Header({ user }: Props) {
 
         <div className="flex items-center space-x-4">
           {user.role === "AGENT" && (
-            <Link
-              href="/equipment"
-              className="text-gray-600 hover:text-blue-600 transition"
-            >
-              Equipos
-            </Link>
+            <div className="flex items-center space-x-4">
+              <Link
+                href="/equipment"
+                className="text-gray-600 hover:text-blue-600 transition"
+              >
+                Equipos
+              </Link>
+              <Link
+                href="/agents"
+                className="text-gray-600 hover:text-blue-600 transition"
+              >
+                Agentes
+              </Link>
+            </div>
           )}
 
           <div className="flex items-center space-x-3">

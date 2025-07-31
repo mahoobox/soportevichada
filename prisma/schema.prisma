@@ -1,3 +1,4 @@
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
 }
@@ -73,10 +74,11 @@ model Ticket {
 }
 
 model Conversation {
-  id        String   @id @default(cuid())
-  message   String   @db.Text
-  isAI      Boolean  @default(false)
-  createdAt DateTime @default(now())
+  id          String   @id @default(cuid())
+  message     String   @db.Text
+  attachments Json?    // Array de URLs de archivos adjuntos en conversaciones
+  isAI        Boolean  @default(false)
+  createdAt   DateTime @default(now())
   
   // Relaciones
   ticketId  String

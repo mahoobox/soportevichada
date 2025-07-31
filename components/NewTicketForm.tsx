@@ -4,6 +4,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import ReCAPTCHA from "react-google-recaptcha";
+import FileUpload from "./FileUpload";
 
 interface User {
   id: string;
@@ -73,20 +74,6 @@ export default function NewTicketForm({ user }: Props) {
       console.error("Error checking serial:", error);
       setSerialStatus("not_found");
     }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files).slice(
-        0,
-        5 - attachments.length
-      );
-      setAttachments((prev) => [...prev, ...newFiles]);
-    }
-  };
-
-  const removeFile = (index: number) => {
-    setAttachments((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -302,96 +289,12 @@ export default function NewTicketForm({ user }: Props) {
         </div>
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Adjuntar Archivos (Opcional, hasta 5)
-        </label>
-        <p className="text-xs text-gray-500 mb-2">
-          Formatos aceptados: .jpg, .jpeg, .png, .pdf
-        </p>
-        <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-          <div className="space-y-1 text-center">
-            <svg
-              className="mx-auto h-12 w-12 text-gray-400"
-              stroke="currentColor"
-              fill="none"
-              viewBox="0 0 48 48"
-            >
-              <path
-                d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-            <div className="flex text-sm text-gray-600">
-              <label
-                htmlFor="file-upload"
-                className="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500"
-              >
-                <span>Subir un archivo</span>
-                <input
-                  id="file-upload"
-                  name="file-upload"
-                  type="file"
-                  className="sr-only"
-                  multiple
-                  accept=".jpg,.jpeg,.png,.pdf"
-                  onChange={handleFileChange}
-                  disabled={attachments.length >= 5}
-                />
-              </label>
-              <p className="pl-1">o arrastrar y soltar</p>
-            </div>
-          </div>
-        </div>
-        {attachments.length > 0 && (
-          <div className="mt-4 space-y-2">
-            {attachments.map((file, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between bg-gray-100 p-2 rounded-md"
-              >
-                <div className="flex items-center space-x-2">
-                  <svg
-                    className="w-5 h-5 text-gray-500"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"
-                    />
-                  </svg>
-                  <span className="text-sm text-gray-800">{file.name}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => removeFile(index)}
-                  className="text-red-500 hover:text-red-700"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <FileUpload
+        files={attachments}
+        onFilesChange={setAttachments}
+        maxFiles={5}
+        disabled={isSubmitting}
+      />
 
       <div className="flex justify-center">
         <ReCAPTCHA

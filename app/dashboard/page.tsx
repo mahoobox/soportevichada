@@ -81,12 +81,20 @@ export default async function DashboardPage() {
             )}
 
             {user.role === "AGENT" && (
-              <Link
-                href="/equipment"
-                className="px-5 py-2 bg-gray-600 text-white font-semibold rounded-md hover:bg-gray-700 transition"
-              >
-                Gestionar Equipos
-              </Link>
+              <>
+                <Link
+                  href="/equipment"
+                  className="px-5 py-2 bg-gray-600 text-white font-semibold rounded-md hover:bg-gray-700 transition"
+                >
+                  Gestionar Equipos
+                </Link>
+                <Link
+                  href="/agents"
+                  className="px-5 py-2 bg-purple-600 text-white font-semibold rounded-md hover:bg-purple-700 transition"
+                >
+                  Gestionar Agentes
+                </Link>
+              </>
             )}
           </div>
         </div>

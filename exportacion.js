@@ -1,4 +1,3 @@
-// exportacion.js
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -9,19 +8,27 @@ const __dirname = path.dirname(__filename);
 const directorioBase = __dirname;
 const archivoSalida = path.join(directorioBase, "exportacion.txt");
 
+const carpetasIgnoradas = [".next", ".vercel", "node_modules"];
+const archivosIgnorados = [
+  "pnpm-lock.yaml",
+  "exportacion.js",
+  "exportacion.txt",
+];
+
 function recorrerDirectorios(directorio, salida) {
   const archivos = fs.readdirSync(directorio);
 
   for (const archivo of archivos) {
-    if (archivo.startsWith(".")) continue; // Ignorar carpetas o archivos ocultos
+    if (archivo.startsWith(".")) continue; // Ignorar archivos ocultos
 
     const rutaCompleta = path.join(directorio, archivo);
     const stat = fs.statSync(rutaCompleta);
 
     if (stat.isDirectory()) {
+      if (carpetasIgnoradas.includes(archivo)) continue;
       recorrerDirectorios(rutaCompleta, salida);
     } else {
-      if (path.resolve(rutaCompleta) === path.resolve(archivoSalida)) continue;
+      if (archivosIgnorados.includes(archivo)) continue;
 
       const rutaRelativa = path.relative(directorioBase, rutaCompleta);
       const contenido = fs.readFileSync(rutaCompleta, "utf-8");
